@@ -31,8 +31,9 @@ When you're done speaking, exit the program.
 Although the interface is only in English, this supports English, Spanish, French, Portuguese, German, Italian, Polish and Hindi with elevenlabs.  These languages, plus Chinese, Japenese, Korean, Russian and Ukrainian are supported via Google TTS.  Anything else you try may or may not work.
 
 ## Supporting me
-If you find SpeakingGPT useful, consider supporting me through donations:
-paypal.me/harrison934394
+
+If you find SpeakingGPT useful, consider [supporting me via PayPal through donations](https://www.paypal.me/harrison934394).
+
 
 ## Thanks to:
 * [Novum Classicum](https://www.novumclassicum.com) for all his help testing various alpha versions before this ever made it to release.  Seriously man, you rock.
