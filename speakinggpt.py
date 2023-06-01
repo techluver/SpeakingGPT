@@ -23,6 +23,7 @@ import json
 import sys
 import argparse
 from num2words import num2words
+import time
 SETTINGS_FILE = "settings.dat"
 def clean_up(*args):
     global aud_audio
@@ -689,7 +690,7 @@ def chat():
         print(f"processing \n")
         sanitized_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
 
-        for _ in range(5):  # replace 3 with desired number of attempts
+        for _ in range(10):  # replace 3 with desired number of attempts
             try:
                 response = openai.ChatCompletion.create(
             model="gpt-4" if settings["gpt4ornot"]["state"] else "gpt-3.5-turbo",
@@ -715,8 +716,14 @@ def chat():
                 # prompt for a new API key here, then continue the loop
                 # you can replace 'continue' with 'break' if you want to stop after first failure
                 continue
+            except openai.error.RateLimitError as e:
+                print("The model is busy. retrying in 15 seconds.")
+                time.sleep(15)
+                continue
         else:
             print("Failed to create a chat completion after several attempts.")
+            file_to_save = input("please enter a file name to save your conversation and try again later.")
+            save_conversation(file_to_save, messages)
             sys.exit()
         chat_response = response['choices'][0]['message']['content']
         print(f"AI: {chat_response}")
