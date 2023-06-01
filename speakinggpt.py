@@ -667,7 +667,7 @@ def chat():
             continue
         if "sc" == clean_message or "saveconversation" in clean_message:
             filenametosave = input("file name?")
-            messages = save_conversation(filenametosave, messages)
+            save_conversation(filenametosave, messages)
             print (f"conversation successfully saved to {filenametosave} \n" )
             continue
         if "chf" == clean_message or "changehandsfree" in clean_message:
