@@ -289,7 +289,8 @@ def recordandtranscribe():
     waveFile.close()
 
     print(f"Recording saved to {aud_FILENAME}.  Transcribing text... \n")
-    segments, info = model.transcribe(aud_FILENAME, beam_size=5)
+    segments, info = model.transcribe(aud_FILENAME, beam_size=5, vad_filter=True,
+    vad_parameters=dict(min_silence_duration_ms=500))
     print("whisper Detected language '%s' with probability %f" % (info.language, info.language_probability))
     logging.info("whisper Detected language {info.language} with probability {info.language_probability}" )
     segments, _ = model.transcribe(aud_FILENAME)
@@ -693,7 +694,7 @@ def chat():
         for _ in range(10):  # replace 3 with desired number of attempts
             try:
                 response = openai.ChatCompletion.create(
-            model="gpt-4" if settings["gpt4ornot"]["state"] else "gpt-3.5-turbo",
+            model="gpt-4" if settings["gpt4ornot"]["state"] else "gpt-3.5-turbo-16k",
             messages=sanitized_messages
         )
                 break
@@ -701,7 +702,7 @@ def chat():
                 if "does not exist" in str(e):
                     print("Switching to GPT-3.5 Turbo due to invalid access to GPT-4.")
                     response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model="gpt-3.5-turbo-16k",
                 messages=sanitized_messages
             )
                     settings["gpt4ornot"]["state"] = False
