@@ -289,35 +289,49 @@ def recordandtranscribe():
     waveFile.close()
 
     print(f"Recording saved to {aud_FILENAME}.  Transcribing text... \n")
-    segments, info = model.transcribe(aud_FILENAME, beam_size=5, vad_filter=True,
-    vad_parameters=dict(min_silence_duration_ms=500))
-    print("whisper Detected language '%s' with probability %f" % (info.language, info.language_probability))
-    logging.info("whisper Detected language {info.language} with probability {info.language_probability}" )
-    segments, _ = model.transcribe(aud_FILENAME)
-    segments = list(segments)  # The transcription will actually run here.
-    texts = []
-    for textsegment in segments:
-        texts.append(textsegment.text)
+    if settings["whisperapiorlocal"]["state"] == True:
+        try:
+            audio_file = open(aud_FILENAME, "rb")
+            message = openai.Audio.transcribe("whisper-1", audio_file).text
+        except Exception as e:
+            settings["whisperapiorlocal"]["state"] = False
+            print(f"An error occurred, switching to local mode.: {str(e)}")
+
+    if settings["whisperapiorlocal"]["state"] == False:
+        segments, info = model.transcribe(aud_FILENAME, beam_size=5, vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=500))
+        print("whisper Detected language '%s' with probability %f" % (info.language, info.language_probability))
+        logging.info("whisper Detected language {info.language} with probability {info.language_probability}" )
+        segments, _ = model.transcribe(aud_FILENAME)
+        segments = list(segments)  # The transcription will actually run here.
+        texts = []
+        for textsegment in segments:
+            texts.append(textsegment.text)
+        message = ' '.join(texts)
     os.remove(aud_FILENAME)
-    message = ' '.join(texts)
+
     print(f"user: {message}")
     return message
 # Settings with their corresponding questions
 settings = {
-    "gpuornot": {
-        "question": "Would you like to try to use the GPU?",
-        "state": None
-    },
     "gpt4ornot": {
         "question": "Would you like to use GPT4? Otherwise, it will use GPT-3.5",
         "state": None
     },
     "handsfreeornot": {
-        "question": "Do you want to use hands free mode? Hands free mode will force you to control the program exclusively via voice.",
+        "question": "Do you want to use hands-free mode? Hands-free mode will force you to control the program exclusively via voice.",
         "state": None
     },
     "useelevenlabs": {
-        "question": "Do you want to use elevenlabs or not? If you press no, the program will use google tts. Be aware that google tts will be used for certain languages as a fallback.",
+        "question": "Do you want to use Elevenlabs or not? If you press 'no', the program will use Google TTS. Be aware that Google TTS will be used for certain languages as a fallback.",
+        "state": None
+    },
+    "whisperapiorlocal": {
+        "question": "Do you want to use Whisper API? If you say no, whisper will be run locally. Using the API is faster but comes with a cost.",
+        "state": None
+    },
+    "gpuornot": {
+        "question": "In case Whisper needs to be run locally, would you like to try to use the GPU?",
         "state": None
     }
 }
