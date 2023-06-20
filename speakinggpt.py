@@ -233,7 +233,7 @@ def get_elevenlabs_voice():
     global voice_names
     if voices == "":
         voices = user.get_available_voices()  # get the voices that can be used.
-        voice_names = {''.join(ch for ch in voice.get_name() if ch.isalnum() or ch.isspace()).lower(): i+1 for i, voice in enumerate(voices)}
+        voice_names = {''.join(ch for ch in voice.initialName if ch.isalnum() or ch.isspace()).lower(): i+1 for i, voice in enumerate(voices)}
     display_elevenlabs_voices(voices)
     user_voice_choice = get_elevenlabs_user_voice_choice(voices)
     voice = voices[user_voice_choice - 1]
