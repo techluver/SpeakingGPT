@@ -146,7 +146,7 @@ def yes_no_question(question):
 def display_elevenlabs_voices(voices):
     print("\nAvailable Voices:")
     for i, voice in enumerate(voices, start=1):
-        print(f"Press {i} for {voice.get_name()}")
+        print(f"Press {i} for {voice.initialName}")
 
 def get_elevenlabs_user_voice_choice(voices):
     global settings
@@ -247,7 +247,7 @@ def recordandtranscribe():
     aud_RATE = 44100
     aud_CHUNK = 1024
     aud_FILENAME = "tempoutput.wav"
-    aud_SILENCE_THRESHOLD = 500  # adjust this as needed
+    aud_SILENCE_THRESHOLD = 1000  # adjust this as needed
     SILENCE_CHUNKS = 60  # adjust this as needed
     # start Recording
     stream = aud_audio.open(format=aud_FORMAT, channels=aud_CHANNELS,
@@ -270,7 +270,7 @@ def recordandtranscribe():
 
         # check for silence here by converting the data to numpy arrays
         audio_data = np.frombuffer(data, dtype=np.int16)
-        if np.abs(audio_data).mean() < 500:  # this threshold depends on your microphone
+        if np.abs(audio_data).mean() < aud_SILENCE_THRESHOLD:  # this threshold depends on your microphone
             silence_chunk_counter += 1
         else:
             silence_chunk_counter = 0  # Reset counter if non-silent chunk detected
