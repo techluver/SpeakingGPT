@@ -8,6 +8,6 @@ faster-whisper
 openai
 nltk
 lingua-language-detector
-elevenlabslib
+elevenlabslib >= 0.12.1
 argparse
 num2words

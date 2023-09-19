@@ -1,3 +1,4 @@
+import itertools
 import keyring
 import sounddevice as sd
 import soundfile as sf
@@ -24,7 +25,32 @@ import sys
 import argparse
 from num2words import num2words
 import time
+
+
 SETTINGS_FILE = "settings.dat"
+
+def contains_sentence_ending(chunk_text):
+    sentence_ending_pattern = r'[.?!]'
+    numbered_list_pattern = r'\d+\.'
+    ip_address_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+    abbreviation_pattern = r'\b[A-Za-z]\.'
+
+    if re.search(sentence_ending_pattern, chunk_text) and \
+            not re.search(numbered_list_pattern, chunk_text) and \
+            not re.search(ip_address_pattern, chunk_text) and \
+            not re.search(abbreviation_pattern, chunk_text):
+        return True
+    else:
+        return False
+
+def sleep_ms(milliseconds):
+    start_time = time.perf_counter()
+    desired_time = milliseconds / 1000  # Convert milliseconds to seconds
+    elapsed_time = 0
+    
+    while elapsed_time < desired_time:
+        elapsed_time = time.perf_counter() - start_time
+
 def clean_up(*args):
     global aud_audio
     aud_audio.terminate()
@@ -308,7 +334,7 @@ def recordandtranscribe():
         for textsegment in segments:
             texts.append(textsegment.text)
         message = ' '.join(texts)
-    os.remove(aud_FILENAME)
+    #os.remove(aud_FILENAME)
 
     print(f"user: {message}")
     return message
@@ -510,41 +536,54 @@ def play_audio_bytes(audio_data):
 def convert_numbers_to_words(text, lang):
     return re.sub(r'\b\d+\b(?=\W|\b)', lambda m: num2words(int(m.group()), lang=lang), text)
 
-def voice_response():
+        
+def extract_text_from_chunks(chunk_iterator):
+    for chunk in chunk_iterator:
+        if 'choices' in chunk and 'delta' in chunk['choices'][0] and 'content' in chunk['choices'][0]['delta']:
+            yield chunk['choices'][0]['delta']['content']
+def store_and_yield(iterator, storage_list):
+    for item in iterator:
+        storage_list.append(item)
+        yield item
+
+def voice_response(text_iterator):
     global detector
     global voice
-    global chat_response
     global messages
-    whatlang = detector.detect_language_of(chat_response)
-    logging.info(f"text: {chat_response} is in {whatlang}")
-    canuseelevenlabs = settings["useelevenlabs"]["state"] == True and whatlang not in [Language.CHINESE, Language.JAPANESE, Language.KOREAN, Language.RUSSIAN, Language.UKRAINIAN]
-    if canuseelevenlabs == True:
-        chunks = split_text()
 
-        for chunk in chunks:
-            try:
-                langchunk = detector.detect_language_of(chunk)
-                if langchunk == Language.ENGLISH:
-                    modelid = 'eleven_monolingual_v1'
-                else:
-                    modelid = 'eleven_multilingual_v1'
-                    chunk = convert_numbers_to_words(chunk, lang= language_isocodes.get(langchunk))
-            except Exception as e:
-                print("An error occurred:", str(e))
-        
-            try:
-                result = voice.generate_stream_audio(chunk, streamInBackground=False, model_id=modelid)
-                str_result = result[0] if isinstance(result[0], str) else result[1]
-                messages[-1]['historyids'].append(str_result)
-            except Exception as e:
-                print(f"An error occurred: {e}")
-                canuseelevenlabs = False
+    # List to store chunks as they're processed
+    chunks = []
 
-    if canuseelevenlabs == False:
-        tts = gTTS(chat_response, lang=language_isocodes.get(whatlang))
+    canuseelevenlabs = settings["useelevenlabs"]["state"] == True
+
+    if canuseelevenlabs:
+        try:
+            modelid = 'eleven_multilingual_v1'
+            playbackOptions = PlaybackOptions(runInBackground=False) 
+            generationOptions = GenerationOptions(model_id=modelid, latencyOptimizationLevel = 3) 
+
+            # Wrap the iterator to store its values
+            storing_iterator = store_and_yield(text_iterator, chunks)
+
+            result = voice.generate_stream_audio_v2(storing_iterator, playbackOptions, generationOptions)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+            canuseelevenlabs = False
+    # If ElevenLabs wasn't used, process the accumulated text with Google TTS
+    if not canuseelevenlabs:
+        accumulated_text = []
+        for chat_response in text_iterator:
+            chunks.append(chat_response)
+            accumulated_text.append(chat_response)
+
+        full_text = ''.join(accumulated_text)
+        whatlang = detector.detect_language_of(full_text)
+        tts = gTTS(full_text, lang=language_isocodes.get(whatlang, 'en'))
         mp3fp = BytesIO()
         tts.write_to_fp(mp3fp)
         play_audio_bytes(mp3fp)
+
+    return ''.join(chunks)  # Return the full text
 
 def word_to_num(word):
     word = ''.join(ch for ch in word if ch.isalnum())  # Remove non-alphanumeric characters
@@ -709,7 +748,8 @@ def chat():
             try:
                 response = openai.ChatCompletion.create(
             model="gpt-4" if settings["gpt4ornot"]["state"] else "gpt-3.5-turbo-16k",
-            messages=sanitized_messages
+            messages=sanitized_messages,
+            stream=True
         )
                 break
             except openai.error.InvalidRequestError as e:
@@ -717,7 +757,8 @@ def chat():
                     print("Switching to GPT-3.5 Turbo due to invalid access to GPT-4.")
                     response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo-16k",
-                messages=sanitized_messages
+                messages=sanitized_messages,
+                stream=True
             )
                     settings["gpt4ornot"]["state"] = False
                     save_settings(settings)
@@ -740,12 +781,11 @@ def chat():
             file_to_save = input("please enter a file name to save your conversation and try again later.")
             save_conversation(file_to_save, messages)
             sys.exit()
-        chat_response = response['choices'][0]['message']['content']
-        print(f"AI: {chat_response}")
-
-        messages.append({"role": "assistant", "content": chat_response, "historyids": []})
-        voice_response()
-
+        text_iterator = extract_text_from_chunks(response)
+        full_response = voice_response(text_iterator)        print(f"ai: {full_response}")        messages.append({"role": "assistant", "content": full_response, "historyids": []})
 if __name__ == "__main__":
     print("Starting the AI...")
     chat()
+
+
+
